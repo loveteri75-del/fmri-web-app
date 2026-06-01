@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AMC fMRI 핑거탭 예습 시스템</title>
   
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1640029074/drawing_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
   
   <style>
     :root {
@@ -185,6 +185,10 @@
         }
       }
 
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
+      }
+
       function downloadCSV(patientID) {
         const total = totalSuccess + totalErrors;
         const finalAccuracy = total > 0 ? ((totalSuccess / total) * 100).toFixed(1) : 0;
@@ -310,52 +314,61 @@
           }
         }
 
-        if (fMRIMode === "ACTIVE" && results.multiHandLandmarks) {
+        // 언제나 손이 캠 화면에 포착되면 관절선을 상시 활성화하여 렌더링하도록 조건 해제
+        if (results.multiHandLandmarks) {
           for (let index = 0; index < results.multiHandLandmarks.length; index++) {
             const landmarks = results.multiHandLandmarks[index];
+            
             drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00f0ff', lineWidth: 2});
             drawLandmarks(canvasCtx, landmarks, {color: '#ef4444', lineWidth: 1, radius: 3});
 
-            const thumb = landmarks[4]; const targetTipIndex = TARGET_SEQUENCE[currentSeqIndex]; const targetFinger = landmarks[targetTipIndex];
-            const dist = Math.hypot(thumb.x - targetFinger.x, thumb.y - targetFinger.y);
-            
-            canvasCtx.beginPath(); canvasCtx.arc(targetFinger.x * canvasElement.width, targetFinger.y * canvasElement.height, 22, 0, 2 * Math.PI);
-            canvasCtx.strokeStyle = "#00f0ff"; canvasCtx.lineWidth = 4; canvasCtx.stroke();
+            // 오직 자극기(ACTIVE) 상태일 때만 인디케이터 서클 표출 및 연산 처리
+            if (fMRIMode === "ACTIVE") {
+              const thumb = landmarks[4]; 
+              const targetTipIndex = TARGET_SEQUENCE[currentSeqIndex]; 
+              const targetFinger = landmarks[targetTipIndex];
+              const dist = Math.hypot(thumb.x - targetFinger.x, thumb.y - targetFinger.y);
+              
+              canvasCtx.beginPath(); 
+              canvasCtx.arc(targetFinger.x * canvasElement.width, targetFinger.y * canvasElement.height, 22, 0, 2 * Math.PI);
+              canvasCtx.strokeStyle = "#00f0ff"; canvasCtx.lineWidth = 4; canvasCtx.stroke();
 
-            if (dist < 0.05 && !isCooldown) {
-              isCooldown = true; totalSuccess++; currentSeqIndex = (currentSeqIndex + 1) % TARGET_SEQUENCE.length;
-              document.getElementById('status').innerText = `🎯 성공! 다음 타겟: ${FINGER_NAMES[TARGET_SEQUENCE[currentSeqIndex]]}`;
-              document.getElementById('status').style.color = "#10b981";
-              updateDashboard();
-              setTimeout(() => { isCooldown = false; }, 320); 
-            } 
-            else if (!isCooldown) {
-              TARGET_SEQUENCE.forEach((tipIndex) => {
-                if (tipIndex !== targetTipIndex) {
-                  const wrongFinger = landmarks[tipIndex]; const wrongDist = Math.hypot(thumb.x - wrongFinger.x, thumb.y - wrongFinger.y);
-                  if (wrongDist < 0.04 && !isCooldown) {
-                    isCooldown = true; totalErrors++;
-                    document.getElementById('status').innerText = `⚠️ 순서 오류! 다시 수행: ${FINGER_NAMES[targetTipIndex]}`;
-                    document.getElementById('status').style.color = "#ef4444";
-                    updateDashboard();
-                    setTimeout(() => { isCooldown = false; }, 320);
+              if (dist < 0.05 && !isCooldown) {
+                isCooldown = true; totalSuccess++; currentSeqIndex = (currentSeqIndex + 1) % TARGET_SEQUENCE.length;
+                document.getElementById('status').innerText = `🎯 성공! 다음 타겟: ${FINGER_NAMES[TARGET_SEQUENCE[currentSeqIndex]]}`;
+                document.getElementById('status').style.color = "#10b981";
+                updateDashboard();
+                setTimeout(() => { isCooldown = false; }, 320); 
+              } 
+              else if (!isCooldown) {
+                TARGET_SEQUENCE.forEach((tipIndex) => {
+                  if (tipIndex !== targetTipIndex) {
+                    const wrongFinger = landmarks[tipIndex]; 
+                    const wrongDist = Math.hypot(thumb.x - wrongFinger.x, wrongFinger.y - wrongFinger.y);
+                    if (wrongDist < 0.04 && !isCooldown) {
+                      isCooldown = true; totalErrors++;
+                      document.getElementById('status').innerText = `⚠️ 순서 오류! 다시 수행: ${FINGER_NAMES[targetTipIndex]}`;
+                      document.getElementById('status').style.color = "#ef4444";
+                      updateDashboard();
+                      setTimeout(() => { isCooldown = false; }, 320);
+                    }
                   }
-                }
-              });
+                });
+              }
             }
           }
         }
         canvasCtx.restore();
       }
 
-      // [강제 우회 완전 패치] 깃허브 서버 전용 최적화 솔루션 주소 매핑
+      // [모바일 대안 솔루션 ⭐] 원격 주소 대신 CDN 자체에서 번들된 자산을 강제 로드하도록 완전 고정
       const hands = new Hands({
         locateFile: (file) => {
           return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
         }
       });
       
-      hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+      hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
       hands.onResults(onResults);
 
       const camera = new Camera(videoElement, {
@@ -367,7 +380,7 @@
         startBtn.innerText = "패러다임 시작 (Start Task)";
         startBtn.disabled = false;
         document.getElementById('status').innerText = message;
-        document.getElementById('status').style.color = "#f59e0b";
+        document.getElementById('status').style.color = "#10b981";
         setTimeout(() => { speakTTS("패러다임 시작을 눌러주세요."); }, 600);
       }
 
@@ -375,7 +388,6 @@
         .then(() => { enableStartButton("초기화 완료: 패러다임 시작을 눌러주세요."); })
         .catch((err) => { 
           console.error(err); 
-          // 깃허브 보안 예외망 대비 강제 활성화 비상 제어
           enableStartButton("초기화 완료: 패러다임 시작을 눌러주세요."); 
         });
     });
