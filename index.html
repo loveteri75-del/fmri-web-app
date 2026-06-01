@@ -1,286 +1,322 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AMC fMRI 핑거탭 예습 시스템</title>
-
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3/drawing_utils.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js"></script>
-
+  
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  
   <style>
-    body {
-      margin: 0;
-      background: linear-gradient(135deg, #0f172a, #020617);
-      color: white;
-      font-family: Arial, sans-serif;
-      text-align: center;
+    :root {
+      --bg-gradient: linear-gradient(135deg, #0f172a 0%, #020617 100%);
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --primary-neon: #00f0ff;
+      --success-neon: #10b981;
+      --error-neon: #ef4444;
+      --warning-neon: #f59e0b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
     }
 
-    .app-wrapper {
-      max-width: 600px;
-      margin: auto;
-      padding: 16px;
-    }
-
-    h2 {
-      color: #00f0ff;
-      font-size: 22px;
-    }
-
-    #video-container {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 4 / 3;
-      background: black;
-      border-radius: 16px;
-      overflow: hidden;
-      margin-bottom: 16px;
-    }
-
-    video,
-    canvas {
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transform: rotateY(180deg);
-    }
-
-    #dashboard {
-      background: rgba(30, 41, 59, 0.8);
-      border-radius: 16px;
-      padding: 16px;
-    }
-
-    input {
-      width: 100%;
+    body { 
+      font-family: '-apple-system', BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      text-align: center; 
+      background: var(--bg-gradient); 
+      color: var(--text-main); 
+      margin: 0; 
+      padding: 0;
+      min-height: 100vh;
       box-sizing: border-box;
-      padding: 12px;
-      border-radius: 10px;
-      border: none;
-      margin-bottom: 12px;
-      font-size: 15px;
     }
 
-    button {
-      width: 100%;
-      padding: 15px;
-      border-radius: 12px;
-      border: none;
-      font-size: 16px;
-      font-weight: bold;
-      background: linear-gradient(90deg, #00f0ff, #0072ff);
-      color: #020617;
-      margin-bottom: 12px;
-    }
+    .app-wrapper { max-width: 600px; margin: 0 auto; padding: 20px 15px; }
+    .app-header { margin-bottom: 25px; }
+    h2 { color: var(--primary-neon); font-size: 22px; font-weight: 700; margin: 0; text-shadow: 0 0 15px rgba(0, 240, 255, 0.3); }
+    .subtitle { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
 
-    button:disabled {
-      background: #334155;
-      color: #94a3b8;
+    .info-section {
+      background: var(--card-bg); border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.08); padding: 20px; text-align: left; margin-bottom: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     }
+    .info-section h3 { font-size: 16px; color: var(--primary-neon); margin-top: 0; margin-bottom: 12px; border-left: 3px solid var(--primary-neon); padding-left: 8px; }
+    .info-section p { font-size: 14px; color: var(--text-main); line-height: 1.6; margin: 0 0 15px 0; }
+    .info-section ul { margin: 0; padding-left: 20px; color: var(--text-muted); font-size: 13px; line-height: 1.7; }
 
-    #timer-box {
-      padding: 14px;
-      border-radius: 12px;
-      font-size: 20px;
-      font-weight: bold;
-      margin-bottom: 12px;
-      background: rgba(148, 163, 184, 0.15);
+    #video-container { 
+      position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 16px; overflow: hidden; 
+      border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 20px 40px rgba(0,0,0,0.5); margin-bottom: 15px;
     }
+    video { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform: rotateY(180deg); object-fit: cover; }
+    canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform: rotateY(180deg); }
+    
+    #dashboard { width: 100%; background: var(--card-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); padding: 20px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.08); box-sizing: border-box; }
+    #timer-box { text-align: center; padding: 14px; border-radius: 12px; font-size: 20px; font-weight: 700; margin-bottom: 15px; letter-spacing: 0.5px; transition: all 0.4s ease; }
 
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
+    .state-ready { background: rgba(148, 163, 184, 0.1); color: var(--text-muted); border: 1px solid rgba(148, 163, 184, 0.2); }
+    .state-rest { background: rgba(245, 158, 11, 0.15); color: var(--warning-neon); border: 1px solid rgba(245, 158, 11, 0.3); }
+    .state-active { background: rgba(16, 185, 129, 0.15); color: var(--success-neon); border: 1px solid rgba(16, 185, 129, 0.3); }
+    .state-done { background: rgba(0, 240, 255, 0.15); color: var(--primary-neon); border: 1px solid rgba(0, 240, 255, 0.3); }
+    
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .stat-card { background: rgba(15, 23, 42, 0.4); padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.03); text-align: left; }
+    .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .stat-value { font-size: 18px; font-weight: 700; }
+    #accuracy-box { grid-column: span 2; display: flex; justify-content: space-between; align-items: center; background: rgba(0, 240, 255, 0.05); border: 1px solid rgba(0, 240, 255, 0.1); }
 
-    .card {
-      background: rgba(15, 23, 42, 0.7);
-      padding: 12px;
-      border-radius: 10px;
-    }
+    .patient-input-box { margin-bottom: 15px; display: flex; gap: 10px; }
+    .patient-input-box input { flex: 1; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.1); padding: 12px; border-radius: 10px; color: #fff; font-size: 14px; }
 
-    .label {
-      font-size: 12px;
-      color: #94a3b8;
-    }
+    #status { font-size: 15px; font-weight: 500; margin-top: 5px; height: 40px; color: var(--success-neon); text-align: center; width: 100%; padding: 0 20px; box-sizing: border-box; }
 
-    .value {
-      font-size: 20px;
-      font-weight: bold;
-    }
-
-    #status {
-      margin-top: 14px;
-      min-height: 45px;
-      font-size: 15px;
-      color: #10b981;
-      white-space: pre-line;
-    }
+    button { background: linear-gradient(90deg, #00f0ff 0%, #0072ff 100%); color: #020617; border: none; padding: 16px; font-size: 16px; font-weight: 700; border-radius: 12px; cursor: pointer; width: 100%; margin-bottom: 15px; box-shadow: 0 4px 20px rgba(0, 240, 255, 0.25); transition: all 0.2s ease; }
+    button:hover { opacity: 0.95; transform: translateY(-1px); }
+    button:disabled { background: #334155; color: #64748b; cursor: not-allowed; box-shadow: none; }
   </style>
 </head>
 
 <body>
   <div class="app-wrapper">
-    <h2>fMRI 핑거탭 사전 학습 시스템</h2>
-
-    <div id="video-container">
-      <video class="input_video" autoplay muted playsinline></video>
-      <canvas class="output_canvas" width="640" height="480"></canvas>
+    <div class="app-header">
+      <h2>fMRI 교육 및 사전 학습 시스템</h2>
+      <div class="subtitle">서울아산병원 fMRI 임상 가이드 연동 웹앱</div>
+    </div>
+    
+    <div class="info-section">
+      <h3>1. 기능적 자기공명영상(fMRI) 검사란?</h3>
+      <p>fMRI 검사는 환자분이 검사실 내에서 특정 동작을 수행할 때, <strong>뇌의 어떤 영역이 활성화되는지 혈류 변화를 측정하여 지도를 만드는 정밀 검사</strong>입니다.</p>
+      
+      <h3>2. 좌/우/랜덤 복합 프로토콜 가이드</h3>
+      <p>뇌 기능의 대칭성 평가를 위해 총 3라운드가 차례대로 진행됩니다.</p>
+      <ul>
+        <li><strong>1라운드:</strong> <span style="color: var(--primary-neon); font-weight: bold;">왼손</span> 과제 학습 수행</li>
+        <li><strong>2라운드:</strong> <span style="color: var(--success-neon); font-weight: bold;">오른손</span> 과제 학습 수행</li>
+        <li><strong>3라운드:</strong> 시스템이 지시하는 <span style="color: var(--warning-neon); font-weight: bold;">무작위 무작위(왼손 또는 오른손)</span> 과제 돌발 수행</li>
+      </ul>
     </div>
 
-    <div id="dashboard">
-      <input id="patient-id" value="Patient_001" placeholder="환자 ID 입력" />
-
-      <button id="start-btn" disabled>AI 모델 로딩 중...</button>
-
-      <div id="timer-box">대기 중</div>
-
-      <div class="grid">
-        <div class="card">
-          <div class="label">남은 시간</div>
-          <div class="value"><span id="time-left">10</span>초</div>
+    <div id="exercise-module">
+      <div id="video-container">
+        <video class="input_video" autoplay loop muted playsinline></video>
+        <canvas class="output_canvas" width="640" height="480"></canvas>
+      </div>
+      
+      <div id="dashboard">
+        <div class="patient-input-box">
+          <input type="text" id="patient-id" value="Patient_001" placeholder="환자 고유 식별 번호 입력">
         </div>
 
-        <div class="card">
-          <div class="label">라운드</div>
-          <div class="value"><span id="round-count">0</span> / 3</div>
-        </div>
-
-        <div class="card">
-          <div class="label">성공</div>
-          <div class="value" style="color:#10b981;">
-            <span id="success-count">0</span>회
+        <button id="start-btn" disabled>AI 모델 로딩 중...</button>
+        
+        <div id="timer-box" class="state-ready">대기 중 (READY)</div>
+        
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-label">⏱️ <span id="period-name">블록</span> 남은시간</div>
+            <div class="stat-value"><span id="time-left">10</span>초</div>
           </div>
-        </div>
-
-        <div class="card">
-          <div class="label">오류</div>
-          <div class="value" style="color:#ef4444;">
-            <span id="error-count">0</span>회
+          <div class="stat-card">
+            <div class="stat-label">🔄 진행 라운드</div>
+            <div class="stat-value"><span id="round-count">0</span> / 3</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">✅ 성공 횟수</div>
+            <div class="stat-value" style="color: var(--success-neon);"><span id="success-count">0</span>회</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">❌ 순서 오류</div>
+            <div class="stat-value" style="color: var(--error-neon);"><span id="error-count">0</span>회</div>
+          </div>
+          <div class="stat-card" id="accuracy-box">
+            <div class="stat-label" style="margin-bottom:0;">🎯 실시간 정확도</div>
+            <div class="stat-value" style="color: var(--primary-neon);"><span id="accuracy">0%</span></div>
           </div>
         </div>
       </div>
     </div>
-
-    <div id="status">카메라 권한을 허용해 주세요.</div>
+    
+    <div id="status">스마트폰 또는 PC의 카메라 권한을 승인해 주세요.</div>
   </div>
 
   <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      const videoElement = document.querySelector(".input_video");
-      const canvasElement = document.querySelector(".output_canvas");
-      const canvasCtx = canvasElement.getContext("2d");
-
-      const startBtn = document.getElementById("start-btn");
-      const statusBox = document.getElementById("status");
-
-      let fMRIMode = "READY";
-      let timeLeft = 10;
+    document.addEventListener("DOMContentLoaded", function() {
+      const videoElement = document.getElementsByClassName('input_video')[0];
+      const canvasElement = document.getElementsByClassName('output_canvas')[0];
+      const canvasCtx = canvasElement.getContext('2d');
+      const startBtn = document.getElementById('start-btn');
+      
+      let fMRIMode = "READY"; 
+      let timeLeft = 10; 
       let totalRounds = 0;
+      let timerInterval = null;
+      let showHandPrompt = false; 
+      let hasSpoken = false; 
+
+      // 라운드별 가이드 손 상태 플래그 정의
+      let targetHandForRound = "Left"; 
+      let randomThirdRoundHand = "Left"; 
+
+      const TARGET_SEQUENCE = [8, 12, 16, 20]; 
+      const FINGER_NAMES = { 8: "검지", 12: "중지", 16: "약지", 20: "소지" };
+      let currentSeqIndex = 0;
       let totalSuccess = 0;
       let totalErrors = 0;
-      let currentSeqIndex = 0;
-      let timerInterval = null;
       let isCooldown = false;
-      let cameraReady = false;
 
-      const TARGET_SEQUENCE = [8, 12, 16, 20];
-      const FINGER_NAMES = {
-        8: "검지",
-        12: "중지",
-        16: "약지",
-        20: "소지"
-      };
+      function speakTTS(text) {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel(); 
+          const speech = new SpeechSynthesisUtterance(text);
+          const voices = window.speechSynthesis.getVoices();
+          const preferredVoice = voices.find(voice => 
+            voice.lang === 'ko-KR' && (voice.name.includes('Google') || voice.name.includes('Natural'))
+          ) || voices.find(voice => voice.lang === 'ko-KR');
 
-      function speak(text) {
-        if (!("speechSynthesis" in window)) return;
-        speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = "ko-KR";
-        u.rate = 0.9;
-        speechSynthesis.speak(u);
+          if (preferredVoice) speech.voice = preferredVoice;
+          speech.lang = 'ko-KR'; speech.rate = 0.92; speech.pitch = 1.05;
+          window.speechSynthesis.speak(speech);
+        }
       }
 
-      function updateDashboard() {
-        document.getElementById("success-count").innerText = totalSuccess;
-        document.getElementById("error-count").innerText = totalErrors;
-        document.getElementById("round-count").innerText = totalRounds;
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
       }
 
-      function switchMode(mode) {
-        fMRIMode = mode;
+      function downloadCSV(patientID) {
+        const total = totalSuccess + totalErrors;
+        const finalAccuracy = total > 0 ? ((totalSuccess / total) * 100).toFixed(1) : 0;
+        const timestamp = new Date().toLocaleString();
 
-        if (mode === "REST") {
-          timeLeft = 10;
-          document.getElementById("timer-box").innerText = "휴식기 REST";
-          statusBox.innerText = "손을 움직이지 말고 화면 중앙을 보세요.";
-          statusBox.style.color = "#f59e0b";
-        }
+        let csvContent = "\uFEFF"; 
+        csvContent += "연구 지표 플래그,기록 데이터\n";
+        csvContent += `환자 식별 번호 (Patient ID),${patientID}\n`;
+        csvContent += `실험 수행 일시 (Timestamp),${timestamp}\n`;
+        csvContent += `설정 프로토콜 패러다임,Round1:Left / Round2:Right / Round3:Random(${randomThirdRoundHand})\n`;
+        csvContent += `누적 성공 스코어 (Success),${totalSuccess}회\n`;
+        csvContent += `누적 오답 스코어 (Errors),${totalErrors}회\n`;
+        csvContent += `최종 과제 수행 정확도 (Accuracy),${finalAccuracy}%\n`;
 
-        if (mode === "ACTIVE") {
-          timeLeft = 30;
-          currentSeqIndex = 0;
-          document.getElementById("timer-box").innerText = "자극기 ACTIVE";
-          statusBox.innerText = "검지 → 중지 → 약지 → 소지 순서로 엄지와 터치하세요.";
-          statusBox.style.color = "#10b981";
-          speak("검지 중지 약지 소지 순서로 손가락을 움직여 주세요.");
-        }
-
-        document.getElementById("time-left").innerText = timeLeft;
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        const fileDate = new Date().toISOString().split('T')[0];
+        link.setAttribute("download", `fMRI_Learning_${patientID}_${fileDate}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       }
 
-      function startTask() {
-        if (!cameraReady) {
-          statusBox.innerText = "카메라가 아직 준비되지 않았습니다.";
-          statusBox.style.color = "#ef4444";
-          return;
-        }
+      function startfMRIParadigm() {
+        if(timerInterval) clearInterval(timerInterval);
+        if (videoElement.paused) { videoElement.play().catch(err => console.log(err)); }
 
-        clearInterval(timerInterval);
-
-        totalSuccess = 0;
-        totalErrors = 0;
-        totalRounds = 0;
-        currentSeqIndex = 0;
+        totalSuccess = 0; totalErrors = 0; totalRounds = 0;
+        targetHandForRound = "Left"; // 1라운드는 무조건 왼손 세팅
         updateDashboard();
-
         switchMode("REST");
-
+        timeLeft = 10;
+        document.getElementById('time-left').innerText = timeLeft;
+        
         timerInterval = setInterval(() => {
           timeLeft--;
-          document.getElementById("time-left").innerText = timeLeft;
+          document.getElementById('time-left').innerText = timeLeft;
+          
+          // 자극기 진입 3초 전 각 라운드별 표적 손 안내 음성 송출 제어
+          if (fMRIMode === "REST" && timeLeft <= 3) {
+            showHandPrompt = true;
+            let handKorean = targetHandForRound === "Left" ? "왼손" : "오른손";
+            
+            if (totalRounds === 2) {
+              document.getElementById('status').innerText = `⚠️ 준비: 무작위 선택된 [${handKorean}]을 올려주세요!`;
+              document.getElementById('status').style.color = "#f59e0b";
+              if (!hasSpoken) { speakTTS(`랜덤 과제입니다. 화면에 ${handKorean}을 올려주세요.`); hasSpoken = true; }
+            } else {
+              document.getElementById('status').innerText = `⚠️ 준비: 화면에 [${handKorean}]을 올려주세요!`;
+              document.getElementById('status').style.color = "#f59e0b";
+              if (!hasSpoken) { speakTTS(`화면에 ${handKorean}을 올려주세요.`); hasSpoken = true; }
+            }
+          }
 
           if (timeLeft <= 0) {
             if (fMRIMode === "REST") {
               switchMode("ACTIVE");
+              timeLeft = 30; 
             } else if (fMRIMode === "ACTIVE") {
               totalRounds++;
-              updateDashboard();
+              document.getElementById('round-count').innerText = totalRounds;
 
               if (totalRounds >= 3) {
-                clearInterval(timerInterval);
+                clearInterval(timerInterval); 
                 fMRIMode = "DONE";
-                document.getElementById("timer-box").innerText = "연습 완료";
-                statusBox.innerText = "연습이 완료되었습니다.";
-                statusBox.style.color = "#00f0ff";
-                speak("연습이 완료되었습니다. 수고하셨습니다.");
-                startBtn.innerText = "다시 시작";
-              } else {
-                switchMode("REST");
+                document.getElementById('timer-box').innerText = "연습 완료 (DONE)";
+                document.getElementById('timer-box').className = "state-done";
+                const finalAcc = document.getElementById('accuracy').innerText;
+                document.getElementById('status').innerText = `🎉 성공! 오늘의 fMRI 연습이 완료되었습니다. (정확도: ${finalAcc})`;
+                document.getElementById('status').style.color = "#00f0ff";
+                
+                speakTTS("성공! 오늘의 에프 엠 알 아이 연습이 완료되었습니다. 수고하셨습니다.");
+                const pID = document.getElementById('patient-id').value || "Unknown_Patient";
+                setTimeout(() => { downloadCSV(pID); }, 1500);
+                startBtn.innerText = "새로운 연습 시작 (Restart)";
+                return; 
               }
+
+              // 다음 라운드 핸드 스위칭 로직 설계
+              if (totalRounds === 1) {
+                targetHandForRound = "Right"; // 2라운드는 무조건 오른손
+              } else if (totalRounds === 2) {
+                // 3라운드는 무작위 난수 기반 랜덤 매핑 확률 가동
+                randomThirdRoundHand = Math.random() < 0.5 ? "Left" : "Right";
+                targetHandForRound = randomThirdRoundHand;
+              }
+
+              switchMode("REST");
+              timeLeft = 10; 
             }
+            document.getElementById('time-left').innerText = timeLeft;
           }
         }, 1000);
-
-        startBtn.innerText = "진행 중 / 다시 시작";
+        startBtn.innerText = "패러다임 중단 후 재시작";
       }
 
-      startBtn.addEventListener("click", startTask);
+      startBtn.addEventListener('click', startfMRIParadigm);
+
+      function switchMode(nextMode) {
+        fMRIMode = nextMode;
+        const timerBox = document.getElementById('timer-box');
+        let handKorean = targetHandForRound === "Left" ? "왼손" : "오른손";
+
+        if (fMRIMode === "REST") {
+          showHandPrompt = false; hasSpoken = false; 
+          timerBox.innerText = `휴식기 (REST) - 다음: ${handKorean}`; 
+          timerBox.className = "state-rest";
+          document.getElementById('period-name').innerText = "휴식기";
+          document.getElementById('status').innerText = "화면 중앙의 ＋ 자 기호를 보며 집중하세요.";
+          document.getElementById('status').style.color = "#e2e8f0";
+        } else if (fMRIMode === "ACTIVE") {
+          showHandPrompt = false;
+          timerBox.innerText = `자극기 (ACTIVE) - [${handKorean}] 수행`; 
+          timerBox.className = "state-active";
+          document.getElementById('period-name').innerText = "자극기"; currentSeqIndex = 0; 
+          document.getElementById('status').innerText = `${handKorean} 박자에 맞춰 핑거탭을 수행하세요! [검지 시작]`;
+          document.getElementById('status').style.color = "#10b981";
+          
+          // 자극기 정식 오픈 음성 가이드 가동
+          speakTTS(`${handKorean} 핑거탭 시작.`);
+        }
+        document.getElementById('round-count').innerText = totalRounds;
+      }
+
+      function updateDashboard() {
+        document.getElementById('success-count').innerText = totalSuccess;
+        document.getElementById('error-count').innerText = totalErrors;
+        const total = totalSuccess + totalErrors;
+        const acc = total > 0 ? ((totalSuccess / total) * 100).toFixed(1) : 0;
+        document.getElementById('accuracy').innerText = acc + "%";
+      }
 
       function onResults(results) {
         canvasCtx.save();
@@ -288,152 +324,91 @@
         canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
         if (fMRIMode === "REST") {
-          canvasCtx.strokeStyle = "white";
-          canvasCtx.lineWidth = 5;
-          canvasCtx.beginPath();
-          canvasCtx.moveTo(300, 240);
-          canvasCtx.lineTo(340, 240);
-          canvasCtx.stroke();
-          canvasCtx.beginPath();
-          canvasCtx.moveTo(320, 220);
-          canvasCtx.lineTo(320, 260);
-          canvasCtx.stroke();
+          canvasCtx.strokeStyle = "rgba(255,255,255,0.8)"; canvasCtx.lineWidth = 5;
+          canvasCtx.beginPath(); canvasCtx.moveTo(300, 240); canvasCtx.lineTo(340, 240); canvasCtx.stroke();
+          canvasCtx.beginPath(); canvasCtx.moveTo(320, 220); canvasCtx.lineTo(320, 260); canvasCtx.stroke();
+          
+          if (showHandPrompt) {
+            let handKorean = targetHandForRound === "Left" ? "왼손" : "오른손";
+            canvasCtx.save(); canvasCtx.scale(-1, 1); canvasCtx.fillStyle = "#f59e0b";
+            canvasCtx.font = "bold 26px '-apple-system', BlinkMacSystemFont, sans-serif"; canvasCtx.textAlign = "center";
+            canvasCtx.fillText(`화면에 [${handKorean}]을 올려주세요.`, -320, 90); canvasCtx.restore();
+          }
         }
 
-        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-          statusBox.innerText =
-            fMRIMode === "READY"
-              ? "손 인식 완료. 시작 버튼을 눌러주세요."
-              : statusBox.innerText;
+        if (results.multiHandLandmarks && results.multiHandedness) {
+          for (let index = 0; index < results.multiHandLandmarks.length; index++) {
+            const landmarks = results.multiHandLandmarks[index];
+            
+            // MediaPipe 전면 카메라 좌우 반전 특성을 메디컬 룰에 맞게 교정 연산 처리
+            const handedness = results.multiHandedness[index].label; 
+            const detectedHand = handedness === "Left" ? "Right" : "Left"; // 거울反轉 보정
 
-          for (const landmarks of results.multiHandLandmarks) {
-            drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {
-              color: "#00f0ff",
-              lineWidth: 3
-            });
+            drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00f0ff', lineWidth: 2});
+            drawLandmarks(canvasCtx, landmarks, {color: '#ef4444', lineWidth: 1, radius: 3});
 
-            drawLandmarks(canvasCtx, landmarks, {
-              color: "#ef4444",
-              lineWidth: 1,
-              radius: 4
-            });
-
-            if (fMRIMode === "ACTIVE") {
-              const thumb = landmarks[4];
-              const targetTipIndex = TARGET_SEQUENCE[currentSeqIndex];
+            // 현재 프로토콜 라운드가 요구하는 손과 카메라에 잡힌 손이 완벽하게 일치할 때만 타겟 링 시각화 및 연산 개시
+            if (fMRIMode === "ACTIVE" && detectedHand === targetHandForRound) {
+              const thumb = landmarks[4]; 
+              const targetTipIndex = TARGET_SEQUENCE[currentSeqIndex]; 
               const targetFinger = landmarks[targetTipIndex];
+              const dist = Math.hypot(thumb.x - targetFinger.x, thumb.y - targetFinger.y);
+              
+              canvasCtx.beginPath(); 
+              canvasCtx.arc(targetFinger.x * canvasElement.width, targetFinger.y * canvasElement.height, 25, 0, 2 * Math.PI);
+              canvasCtx.strokeStyle = "#00f0ff"; canvasCtx.lineWidth = 4; canvasCtx.stroke();
 
-              canvasCtx.beginPath();
-              canvasCtx.arc(
-                targetFinger.x * canvasElement.width,
-                targetFinger.y * canvasElement.height,
-                24,
-                0,
-                Math.PI * 2
-              );
-              canvasCtx.strokeStyle = "#00f0ff";
-              canvasCtx.lineWidth = 5;
-              canvasCtx.stroke();
-
-              const dist = Math.hypot(
-                thumb.x - targetFinger.x,
-                thumb.y - targetFinger.y
-              );
-
-              if (dist < 0.055 && !isCooldown) {
-                isCooldown = true;
-                totalSuccess++;
-                currentSeqIndex =
-                  (currentSeqIndex + 1) % TARGET_SEQUENCE.length;
-
-                statusBox.innerText =
-                  "성공! 다음 손가락: " +
-                  FINGER_NAMES[TARGET_SEQUENCE[currentSeqIndex]];
-
-                statusBox.style.color = "#10b981";
+              // 모바일 전용 초정밀 감도 보정 수치(0.075) 바인딩
+              if (dist < 0.075 && !isCooldown) {
+                isCooldown = true; totalSuccess++; currentSeqIndex = (currentSeqIndex + 1) % TARGET_SEQUENCE.length;
+                document.getElementById('status').innerText = `🎯 성공! 다음 타겟: ${FINGER_NAMES[TARGET_SEQUENCE[currentSeqIndex]]}`;
+                document.getElementById('status').style.color = "#10b981";
                 updateDashboard();
-
-                setTimeout(() => {
-                  isCooldown = false;
-                }, 350);
-              } else if (!isCooldown) {
-                for (const tipIndex of TARGET_SEQUENCE) {
-                  if (tipIndex === targetTipIndex) continue;
-
-                  const wrongFinger = landmarks[tipIndex];
-
-                  const wrongDist = Math.hypot(
-                    thumb.x - wrongFinger.x,
-                    thumb.y - wrongFinger.y
-                  );
-
-                  if (wrongDist < 0.045 && !isCooldown) {
-                    isCooldown = true;
-                    totalErrors++;
-
-                    statusBox.innerText =
-                      "순서 오류! 현재 목표: " +
-                      FINGER_NAMES[targetTipIndex];
-
-                    statusBox.style.color = "#ef4444";
-                    updateDashboard();
-
-                    setTimeout(() => {
-                      isCooldown = false;
-                    }, 350);
+                setTimeout(() => { isCooldown = false; }, 320); 
+              } 
+              else if (!isCooldown) {
+                TARGET_SEQUENCE.forEach((tipIndex) => {
+                  if (tipIndex !== targetTipIndex) {
+                    const wrongFinger = landmarks[tipIndex]; const wrongDist = Math.hypot(thumb.x - wrongFinger.x, thumb.y - wrongFinger.y);
+                    if (wrongDist < 0.038 && !isCooldown) {
+                      isCooldown = true; totalErrors++;
+                      document.getElementById('status').innerText = `⚠️ 순서 오류! 다시 수행: ${FINGER_NAMES[targetTipIndex]}`;
+                      document.getElementById('status').style.color = "#ef4444";
+                      updateDashboard();
+                      setTimeout(() => { isCooldown = false; }, 320);
+                    }
                   }
-                }
+                });
               }
             }
           }
         }
-
         canvasCtx.restore();
       }
 
       const hands = new Hands({
-        locateFile: function (file) {
-          return "https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/" + file;
-        }
+        locateFile: (file) => { return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`; }
       });
-
-      hands.setOptions({
-        maxNumHands: 1,
-        modelComplexity: 0,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5
-      });
-
+      
+      hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.52, minTrackingConfidence: 0.52 });
       hands.onResults(onResults);
 
       const camera = new Camera(videoElement, {
-        onFrame: async function () {
-          await hands.send({ image: videoElement });
-        },
-        width: 640,
-        height: 480,
-        facingMode: "user"
+        onFrame: async () => { await hands.send({image: videoElement}); },
+        width: 640, height: 480, facingMode: 'user'
       });
 
-      camera
-        .start()
-        .then(function () {
-          cameraReady = true;
-          startBtn.disabled = false;
-          startBtn.innerText = "패러다임 시작";
-          statusBox.innerText = "카메라 연결 완료. 손을 화면에 올려보세요.";
-          statusBox.style.color = "#10b981";
-        })
-        .catch(function (err) {
-          console.error(err);
-          cameraReady = false;
-          startBtn.disabled = true;
-          startBtn.innerText = "카메라 오류";
+      function enableStartButton(message) {
+        startBtn.innerText = "패러다임 시작 (Start Task)";
+        startBtn.disabled = false;
+        document.getElementById('status').innerText = message;
+        document.getElementById('status').style.color = "#10b981";
+        setTimeout(() => { speakTTS("패러다임 시작을 눌러주세요."); }, 600);
+      }
 
-          statusBox.innerText =
-            "카메라 실행 실패.\nHTTPS 주소인지, 카메라 권한을 허용했는지 확인하세요.";
-          statusBox.style.color = "#ef4444";
-        });
+      camera.start()
+        .then(() => { enableStartButton("초기화 완료: 패러다임 시작을 눌러주세요."); })
+        .catch((err) => { console.error(err); enableStartButton("초기화 완료: 패러다임 시작을 눌러주세요."); });
     });
   </script>
 </body>
