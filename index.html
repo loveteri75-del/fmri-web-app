@@ -8,749 +8,531 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <!-- TensorFlow.js + HandPose (모바일 Chrome 완전 호환 / MediaPipe CDN 의존 없음) -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.20.0/dist/tf-core.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.20.0/dist/tf-backend-webgl.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection@2.0.1/dist/hand-pose-detection.min.js"></script>
 
   <style>
     :root {
       --bg:        #070d1a;
-      --surface:   rgba(13, 24, 45, 0.85);
-      --border:    rgba(0, 200, 255, 0.12);
+      --surface:   rgba(13,24,45,0.88);
+      --border:    rgba(0,200,255,0.13);
       --cyan:      #00c8ff;
-      --cyan-dim:  rgba(0, 200, 255, 0.18);
+      --cyan-dim:  rgba(0,200,255,0.16);
       --green:     #00e5a0;
-      --green-dim: rgba(0, 229, 160, 0.15);
+      --green-dim: rgba(0,229,160,0.14);
       --red:       #ff4d6a;
       --amber:     #ffb830;
       --text:      #e8f0fe;
-      --muted:     #5a7090;
+      --muted:     #4a6080;
       --mono:      'JetBrains Mono', monospace;
       --sans:      'Noto Sans KR', sans-serif;
     }
-
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     html, body {
       width: 100%; min-height: 100vh;
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--sans);
-      -webkit-font-smoothing: antialiased;
-      overflow-x: hidden;
+      background: var(--bg); color: var(--text);
+      font-family: var(--sans); -webkit-font-smoothing: antialiased; overflow-x: hidden;
     }
-
-    /* 배경 격자 패턴 */
     body::before {
-      content: '';
-      position: fixed; inset: 0; z-index: 0;
-      background-image:
-        linear-gradient(rgba(0,200,255,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,200,255,0.03) 1px, transparent 1px);
-      background-size: 40px 40px;
-      pointer-events: none;
+      content: ''; position: fixed; inset: 0; z-index: 0;
+      background-image: linear-gradient(rgba(0,200,255,0.025) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(0,200,255,0.025) 1px, transparent 1px);
+      background-size: 40px 40px; pointer-events: none;
     }
+    .wrap { position: relative; z-index: 1; width: 100%; max-width: 560px; margin: 0 auto; padding: 18px 14px 32px; }
 
-    .wrap {
-      position: relative; z-index: 1;
-      width: 100%; max-width: 560px;
-      margin: 0 auto;
-      padding: 18px 14px 30px;
-    }
+    .hd { text-align: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+    .hd-badge { display: inline-block; background: var(--cyan-dim); border: 1px solid var(--cyan); color: var(--cyan); font-family: var(--mono); font-size: 10px; letter-spacing: 2px; padding: 3px 10px; border-radius: 4px; margin-bottom: 10px; }
+    .hd h1 { font-size: 20px; font-weight: 700; color: #fff; letter-spacing: -0.3px; line-height: 1.35; }
+    .hd-sub { font-size: 12px; color: var(--muted); margin-top: 5px; }
 
-    /* ── 헤더 ── */
-    .hd {
-      text-align: center;
-      margin-bottom: 22px;
-      padding-bottom: 18px;
-      border-bottom: 1px solid var(--border);
-    }
-    .hd-badge {
-      display: inline-block;
-      background: var(--cyan-dim);
-      border: 1px solid var(--cyan);
-      color: var(--cyan);
-      font-family: var(--mono);
-      font-size: 10px;
-      letter-spacing: 2px;
-      padding: 3px 10px;
-      border-radius: 4px;
-      margin-bottom: 10px;
-    }
-    .hd h1 {
-      font-size: 20px;
-      font-weight: 700;
-      color: #fff;
-      letter-spacing: -0.3px;
-      line-height: 1.3;
-    }
-    .hd-sub {
-      font-size: 12px;
-      color: var(--muted);
-      margin-top: 5px;
-    }
+    .info-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; margin-bottom: 16px; backdrop-filter: blur(12px); }
+    .info-card h3 { font-size: 11px; font-family: var(--mono); color: var(--cyan); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 9px; }
+    .info-card p { font-size: 13px; line-height: 1.65; color: #a0b8cc; }
+    .round-list { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+    .round-item { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #a0b8cc; }
+    .round-badge { font-family: var(--mono); font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; }
+    .rb-l    { background: rgba(0,200,255,0.13); color: var(--cyan);  border: 1px solid var(--cyan); }
+    .rb-r    { background: rgba(0,229,160,0.13); color: var(--green); border: 1px solid var(--green); }
+    .rb-rand { background: rgba(255,184,48,0.13); color: var(--amber); border: 1px solid var(--amber); }
 
-    /* ── 안내 카드 ── */
-    .info-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px 18px;
-      margin-bottom: 18px;
-      backdrop-filter: blur(12px);
-    }
-    .info-card h3 {
-      font-size: 12px;
-      font-family: var(--mono);
-      color: var(--cyan);
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      margin-bottom: 9px;
-    }
-    .info-card p {
-      font-size: 13px;
-      line-height: 1.65;
-      color: #b0c4d8;
-    }
-    .round-list {
-      margin-top: 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .round-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 13px;
-      color: #b0c4d8;
-    }
-    .round-badge {
-      font-family: var(--mono);
-      font-size: 10px;
-      font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 4px;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-    .rb-left  { background: rgba(0,200,255,0.15); color: var(--cyan);  border: 1px solid var(--cyan); }
-    .rb-right { background: rgba(0,229,160,0.15); color: var(--green); border: 1px solid var(--green); }
-    .rb-rand  { background: rgba(255,184,48,0.15); color: var(--amber); border: 1px solid var(--amber); }
+    #video-wrap { position: relative; width: 100%; aspect-ratio: 4/3; max-height: 58vh; background: #000; border-radius: 16px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 0 40px rgba(0,200,255,0.06), 0 20px 40px rgba(0,0,0,0.5); margin-bottom: 14px; }
+    #v  { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+    #c  { position: absolute; inset: 0; width: 100%; height: 100%; transform: scaleX(-1); }
+    #overlay { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(7,13,26,0.82); border: 1px solid var(--border); border-radius: 8px; padding: 5px 14px; font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; backdrop-filter: blur(8px); z-index: 10; transition: color .3s; }
 
-    /* ── 비디오 ── */
-    #video-wrap {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 4/3;
-      max-height: 58vh;
-      background: #000;
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-      box-shadow: 0 0 40px rgba(0,200,255,0.07), 0 20px 40px rgba(0,0,0,0.5);
-      margin-bottom: 14px;
-    }
-    #video-wrap video,
-    #video-wrap canvas {
-      position: absolute;
-      inset: 0;
-      width: 100%; height: 100%;
-      object-fit: cover;
-      transform: scaleX(-1); /* 미러링 */
-    }
-
-    /* 비디오 위 상태 오버레이 */
-    #overlay-status {
-      position: absolute;
-      bottom: 12px; left: 50%;
-      transform: translateX(-50%);
-      background: rgba(7,13,26,0.82);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 6px 14px;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text);
-      white-space: nowrap;
-      backdrop-filter: blur(8px);
-      z-index: 10;
-      transition: color 0.3s;
-    }
-
-    /* ── 대시보드 ── */
-    #dashboard {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 16px;
-      backdrop-filter: blur(12px);
-      margin-bottom: 14px;
-    }
-
-    /* 환자 입력 */
-    .pid-row {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-    .pid-label {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--muted);
-      letter-spacing: 1px;
-      margin-bottom: 5px;
-    }
-    .pid-row input {
-      flex: 1;
-      background: rgba(0,0,0,0.35);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 9px;
-      color: var(--text);
-      font-size: 14px;
-      font-family: var(--mono);
-      padding: 11px 13px;
-      outline: none;
-      transition: border-color 0.2s;
-    }
+    #dashboard { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px; backdrop-filter: blur(12px); margin-bottom: 14px; }
+    .pid-label { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 1px; margin-bottom: 5px; }
+    .pid-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    .pid-row input { flex: 1; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); border-radius: 9px; color: var(--text); font-size: 14px; font-family: var(--mono); padding: 11px 13px; outline: none; transition: border-color .2s; }
     .pid-row input:focus { border-color: var(--cyan); }
 
-    /* 시작 버튼 */
-    #start-btn {
-      width: 100%;
-      padding: 14px;
-      border: none;
-      border-radius: 11px;
-      font-size: 15px;
-      font-weight: 700;
-      font-family: var(--sans);
-      cursor: pointer;
-      margin-bottom: 12px;
-      background: linear-gradient(90deg, #00c8ff 0%, #0055ff 100%);
-      color: #030810;
-      box-shadow: 0 4px 20px rgba(0,200,255,0.25);
-      transition: opacity 0.2s, transform 0.15s;
-      letter-spacing: 0.3px;
-    }
-    #start-btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
-    #start-btn:disabled {
-      background: #1a2535;
-      color: var(--muted);
-      cursor: not-allowed;
-      box-shadow: none;
-    }
+    #load-bar-wrap { width: 100%; height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; margin-bottom: 10px; overflow: hidden; display: none; }
+    #load-bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--cyan), var(--green)); border-radius: 2px; transition: width .4s ease; }
 
-    /* 타이머 박스 */
-    #timer-box {
-      text-align: center;
-      padding: 12px;
-      border-radius: 11px;
-      font-size: 16px;
-      font-weight: 700;
-      font-family: var(--mono);
-      margin-bottom: 12px;
-      letter-spacing: 0.5px;
-      transition: all 0.35s ease;
-    }
-    .s-ready  { background: rgba(90,112,144,0.12); color: var(--muted);  border: 1px solid rgba(90,112,144,0.2); }
+    #start-btn { width: 100%; padding: 14px; border: none; border-radius: 11px; font-size: 15px; font-weight: 700; font-family: var(--sans); cursor: pointer; margin-bottom: 12px; background: linear-gradient(90deg, #00c8ff 0%, #0055ff 100%); color: #030810; box-shadow: 0 4px 20px rgba(0,200,255,0.22); transition: opacity .2s, transform .15s; letter-spacing: .3px; }
+    #start-btn:hover:not(:disabled) { opacity: .9; transform: translateY(-1px); }
+    #start-btn:disabled { background: #1a2535; color: var(--muted); cursor: not-allowed; box-shadow: none; }
+
+    #timer-box { text-align: center; padding: 12px; border-radius: 11px; font-size: 16px; font-weight: 700; font-family: var(--mono); margin-bottom: 12px; letter-spacing: .5px; transition: all .35s ease; }
+    .s-ready  { background: rgba(74,96,128,0.1);   color: var(--muted);  border: 1px solid rgba(74,96,128,0.2); }
     .s-rest   { background: rgba(255,184,48,0.1);  color: var(--amber);  border: 1px solid rgba(255,184,48,0.3); }
     .s-active { background: var(--green-dim);       color: var(--green);  border: 1px solid rgba(0,229,160,0.3); }
     .s-done   { background: var(--cyan-dim);        color: var(--cyan);   border: 1px solid rgba(0,200,255,0.3); }
 
-    /* 스탯 그리드 */
-    .stat-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-    .stat-cell {
-      background: rgba(0,0,0,0.25);
-      border: 1px solid rgba(255,255,255,0.04);
-      border-radius: 10px;
-      padding: 11px 13px;
-    }
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stat-cell { background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.04); border-radius: 10px; padding: 11px 13px; }
     .stat-cell.full { grid-column: span 2; display: flex; justify-content: space-between; align-items: center; background: rgba(0,200,255,0.04); border-color: rgba(0,200,255,0.1); }
-    .sl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; font-family: var(--mono); }
+    .sl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 4px; font-family: var(--mono); }
     .sv { font-size: 18px; font-weight: 700; font-family: var(--mono); }
-    .sv-cyan  { color: var(--cyan); }
-    .sv-green { color: var(--green); }
-    .sv-red   { color: var(--red); }
+    .sv-c { color: var(--cyan); } .sv-g { color: var(--green); } .sv-r { color: var(--red); }
 
-    /* 하단 상태 텍스트 */
-    #status {
-      text-align: center;
-      font-size: 13.5px;
-      font-weight: 600;
-      color: var(--green);
-      min-height: 38px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0 8px;
-      line-height: 1.45;
-    }
+    #status { text-align: center; font-size: 13.5px; font-weight: 600; color: var(--green); min-height: 38px; display: flex; align-items: center; justify-content: center; padding: 0 8px; line-height: 1.45; }
 
-    /* 로딩 스피너 */
-    .spinner {
-      display: inline-block;
-      width: 14px; height: 14px;
-      border: 2px solid var(--muted);
-      border-top-color: var(--cyan);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      vertical-align: middle;
-      margin-right: 7px;
-    }
+    .spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid rgba(255,255,255,0.15); border-top-color: var(--cyan); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: middle; margin-right: 7px; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
-
 <body>
 <div class="wrap">
-
-  <!-- 헤더 -->
   <div class="hd">
     <div class="hd-badge">AMC · FMRI TRAINING SYSTEM</div>
     <h1>fMRI 핑거탭<br>교육 및 사전 학습</h1>
     <div class="hd-sub">서울아산병원 fMRI 임상 가이드 연동 웹앱</div>
   </div>
 
-  <!-- 안내 -->
   <div class="info-card">
     <h3>기능적 자기공명영상(fMRI) 검사란?</h3>
     <p>특정 동작 수행 시 <strong style="color:var(--text)">뇌의 활성화 영역을 혈류 변화로 측정</strong>하는 정밀 검사입니다. 총 3라운드가 순서대로 진행됩니다.</p>
     <div class="round-list">
-      <div class="round-item"><span class="round-badge rb-left">R1 · LEFT</span> 왼손 핑거탭 과제 수행</div>
-      <div class="round-item"><span class="round-badge rb-right">R2 · RIGHT</span> 오른손 핑거탭 과제 수행</div>
-      <div class="round-item"><span class="round-badge rb-rand">R3 · RANDOM</span> 시스템이 지시하는 무작위 손 수행</div>
+      <div class="round-item"><span class="round-badge rb-l">R1 · LEFT</span>왼손 핑거탭 과제 수행</div>
+      <div class="round-item"><span class="round-badge rb-r">R2 · RIGHT</span>오른손 핑거탭 과제 수행</div>
+      <div class="round-item"><span class="round-badge rb-rand">R3 · RANDOM</span>시스템이 지시하는 무작위 손 수행</div>
     </div>
   </div>
 
-  <!-- 카메라 -->
   <div id="video-wrap">
     <video id="v" autoplay playsinline muted></video>
     <canvas id="c"></canvas>
-    <div id="overlay-status">카메라 초기화 중...</div>
+    <div id="overlay">모델 로딩 중...</div>
   </div>
 
-  <!-- 대시보드 -->
   <div id="dashboard">
     <div class="pid-label">PATIENT ID</div>
     <div class="pid-row">
       <input type="text" id="patient-id" value="Patient_001" placeholder="환자 고유 식별 번호">
     </div>
-
+    <div id="load-bar-wrap"><div id="load-bar"></div></div>
     <button id="start-btn" disabled><span class="spinner"></span>AI 모델 로딩 중...</button>
-
     <div id="timer-box" class="s-ready">대기 중 — READY</div>
-
     <div class="stat-grid">
-      <div class="stat-cell">
-        <div class="sl">⏱ 남은 시간</div>
-        <div class="sv sv-cyan"><span id="time-left">—</span> 초</div>
-      </div>
-      <div class="stat-cell">
-        <div class="sl">🔄 라운드</div>
-        <div class="sv sv-cyan"><span id="round-count">0</span> / 3</div>
-      </div>
-      <div class="stat-cell">
-        <div class="sl">✅ 성공</div>
-        <div class="sv sv-green"><span id="success-count">0</span> 회</div>
-      </div>
-      <div class="stat-cell">
-        <div class="sl">❌ 오류</div>
-        <div class="sv sv-red"><span id="error-count">0</span> 회</div>
-      </div>
+      <div class="stat-cell"><div class="sl">⏱ 남은 시간</div><div class="sv sv-c"><span id="time-left">—</span> 초</div></div>
+      <div class="stat-cell"><div class="sl">🔄 라운드</div><div class="sv sv-c"><span id="round-count">0</span> / 3</div></div>
+      <div class="stat-cell"><div class="sl">✅ 성공</div><div class="sv sv-g"><span id="success-count">0</span> 회</div></div>
+      <div class="stat-cell"><div class="sl">❌ 오류</div><div class="sv sv-r"><span id="error-count">0</span> 회</div></div>
       <div class="stat-cell full">
         <div class="sl" style="margin-bottom:0">🎯 실시간 정확도</div>
-        <div class="sv sv-cyan"><span id="accuracy">—</span></div>
+        <div class="sv sv-c"><span id="accuracy">—</span></div>
       </div>
     </div>
   </div>
-
-  <div id="status">스마트폰 또는 PC의 카메라 권한을 승인해 주세요.</div>
+  <div id="status">카메라 권한을 승인해 주세요.</div>
 </div>
 
 <script>
-(function() {
-  /* ── 요소 ── */
-  const video       = document.getElementById('v');
-  const canvas      = document.getElementById('c');
-  const ctx         = canvas.getContext('2d');
-  const startBtn    = document.getElementById('start-btn');
-  const timerBox    = document.getElementById('timer-box');
-  const overlayEl   = document.getElementById('overlay-status');
+(function(){
+'use strict';
 
-  const elTime      = document.getElementById('time-left');
-  const elRound     = document.getElementById('round-count');
-  const elSuccess   = document.getElementById('success-count');
-  const elError     = document.getElementById('error-count');
-  const elAcc       = document.getElementById('accuracy');
-  const elStatus    = document.getElementById('status');
+const video     = document.getElementById('v');
+const canvas    = document.getElementById('c');
+const ctx       = canvas.getContext('2d');
+const startBtn  = document.getElementById('start-btn');
+const timerBox  = document.getElementById('timer-box');
+const overlayEl = document.getElementById('overlay');
+const loadBarW  = document.getElementById('load-bar-wrap');
+const loadBar   = document.getElementById('load-bar');
+const elTime    = document.getElementById('time-left');
+const elRound   = document.getElementById('round-count');
+const elSuccess = document.getElementById('success-count');
+const elError   = document.getElementById('error-count');
+const elAcc     = document.getElementById('accuracy');
+const elStatus  = document.getElementById('status');
 
-  /* ── 상수 ── */
-  const SEQ   = [8, 12, 16, 20];
-  const FNAME = { 8:'검지', 12:'중지', 16:'약지', 20:'소지' };
-  const REST_SEC   = 10;
-  const ACTIVE_SEC = 30;
+/* 상수 */
+const SEQ        = [8, 12, 16, 20];
+const FNAME      = {8:'검지', 12:'중지', 16:'약지', 20:'소지'};
+const REST_SEC   = 10;
+const ACTIVE_SEC = 30;
+const TOUCH_DIST = 0.075;
+const WRONG_DIST = 0.038;
 
-  /* ── 상태 ── */
-  let mode          = 'READY';
-  let timeLeft      = 0;
-  let totalRounds   = 0;
-  let targetHand    = 'Left';
-  let randThirdHand = 'Left';
-  let seqIdx        = 0;
-  let totalSuccess  = 0;
-  let totalErrors   = 0;
-  let isCooldown    = false;
-  let timerRef      = null;
-  let timerStart    = null;    // Date.now() 기반 오차 보정용
-  let showPrompt    = false;
-  let hasSpoken     = false;
-  let rafId         = null;    // requestAnimationFrame ID
-  let handsReady    = false;
+/* 손 연결선 (MediaPipe 21 keypoint 기준) */
+const CONNECTIONS = [
+  [0,1],[1,2],[2,3],[3,4],
+  [0,5],[5,6],[6,7],[7,8],
+  [0,9],[9,10],[10,11],[11,12],
+  [0,13],[13,14],[14,15],[15,16],
+  [0,17],[17,18],[18,19],[19,20],
+  [5,9],[9,13],[13,17]
+];
 
-  /* ── TTS ── */
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+/* 상태 */
+let mode         = 'READY';
+let timeLeft     = 0;
+let totalRounds  = 0;
+let targetHand   = 'Left';
+let randThird    = 'Left';
+let seqIdx       = 0;
+let totalSuccess = 0;
+let totalErrors  = 0;
+let isCooldown   = false;
+let timerRef     = null;
+let secInit      = REST_SEC;
+let showPrompt   = false;
+let hasSpoken    = false;
+let rafId        = null;
+let detector     = null;
+
+/* TTS */
+if('speechSynthesis' in window)
+  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+
+function speak(t) {
+  if(!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(t);
+  const vv = window.speechSynthesis.getVoices();
+  u.voice = vv.find(v => v.lang==='ko-KR' && v.name.includes('Google'))
+          || vv.find(v => v.lang==='ko-KR') || null;
+  u.lang='ko-KR'; u.rate=0.92; u.pitch=1.05;
+  window.speechSynthesis.speak(u);
+}
+
+/* UI 헬퍼 */
+function setOverlay(t, c) { overlayEl.textContent=t; overlayEl.style.color=c||'var(--text)'; }
+function setStatus(t, c)  { elStatus.textContent=t;  elStatus.style.color=c||'var(--text)'; }
+function hk(h)             { return h==='Left' ? '왼손' : '오른손'; }
+function setLoadPct(p)     { loadBar.style.width=p+'%'; }
+
+function updateStats() {
+  elSuccess.textContent = totalSuccess;
+  elError.textContent   = totalErrors;
+  const tot = totalSuccess + totalErrors;
+  elAcc.textContent = tot > 0 ? ((totalSuccess/tot)*100).toFixed(1)+'%' : '—';
+}
+
+/* 모드 전환 */
+function switchMode(next) {
+  mode = next;
+  const h = hk(targetHand);
+  if(mode === 'REST') {
+    showPrompt=false; hasSpoken=false;
+    timerBox.textContent = `휴식기 (REST) — 다음: ${h}`;
+    timerBox.className = 's-rest';
+    setStatus('화면 중앙의 ＋ 자 기호를 보며 집중하세요.', '#e8f0fe');
+    setOverlay('REST', 'var(--amber)');
+  } else if(mode === 'ACTIVE') {
+    showPrompt=false; seqIdx=0;
+    timerBox.textContent = `자극기 (ACTIVE) — [${h}] 수행`;
+    timerBox.className = 's-active';
+    setStatus(`${h} 핑거탭을 수행하세요! [검지 시작]`, 'var(--green)');
+    setOverlay(`ACTIVE · ${h}`, 'var(--green)');
+    speak(`${h} 핑거탭 시작.`);
   }
-  function speak(text) {
-    if (!('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    const voices = window.speechSynthesis.getVoices();
-    u.voice = voices.find(v => v.lang === 'ko-KR' && v.name.includes('Google'))
-           || voices.find(v => v.lang === 'ko-KR')
-           || null;
-    u.lang = 'ko-KR'; u.rate = 0.92; u.pitch = 1.05;
-    window.speechSynthesis.speak(u);
-  }
+  elRound.textContent = totalRounds;
+}
 
-  /* ── UI 업데이트 ── */
-  function setOverlay(text, color) {
-    overlayEl.textContent = text;
-    overlayEl.style.color = color || 'var(--text)';
-  }
-  function setStatus(text, color) {
-    elStatus.textContent = text;
-    elStatus.style.color = color || 'var(--text)';
-  }
-  function updateStats() {
-    elSuccess.textContent = totalSuccess;
-    elError.textContent   = totalErrors;
-    const total = totalSuccess + totalErrors;
-    elAcc.textContent = total > 0 ? ((totalSuccess/total)*100).toFixed(1)+'%' : '—';
-  }
+/* 타이머 — Date.now 기반으로 누적 오차 없음 */
+function startTimer(sec) {
+  if(timerRef) clearTimeout(timerRef);
+  secInit=sec; timeLeft=sec;
+  elTime.textContent = timeLeft;
+  const t0 = Date.now();
 
-  /* ── 모드 전환 ── */
-  function handKo(h) { return h === 'Left' ? '왼손' : '오른손'; }
+  function tick() {
+    const elapsed = Date.now() - t0;
+    const tickNum = Math.floor(elapsed / 1000);
+    timeLeft = secInit - tickNum;
+    elTime.textContent = Math.max(0, timeLeft);
 
-  function switchMode(next) {
-    mode = next;
-    const hk = handKo(targetHand);
-    if (mode === 'REST') {
-      showPrompt = false; hasSpoken = false;
-      timerBox.textContent = `휴식기 (REST) — 다음: ${hk}`;
-      timerBox.className = 's-rest';
-      setStatus('화면 중앙의 ＋ 자 기호를 보며 집중하세요.', '#e8f0fe');
-      setOverlay('REST', 'var(--amber)');
-    } else if (mode === 'ACTIVE') {
-      showPrompt = false; seqIdx = 0;
-      timerBox.textContent = `자극기 (ACTIVE) — [${hk}] 수행`;
-      timerBox.className = 's-active';
-      setStatus(`${hk} 핑거탭을 수행하세요! [검지 시작]`, 'var(--green)');
-      setOverlay(`ACTIVE · ${hk}`, 'var(--green)');
-      speak(`${hk} 핑거탭 시작.`);
-    }
-    elRound.textContent = totalRounds;
-  }
+    if(timeLeft <= 0) { onPeriodEnd(); return; }
 
-  /* ── 타이머 (Date.now 기반 오차 보정) ── */
-  function startTimer(seconds) {
-    if (timerRef) clearTimeout(timerRef);
-    timeLeft = seconds;
-    timerStart = Date.now();
-    elTime.textContent = timeLeft;
-    scheduleTick();
-  }
-
-  function scheduleTick() {
-    const elapsed  = Date.now() - timerStart;
-    const expected = (seconds_initial - timeLeft + 1) * 1000;
-    // 다음 틱까지 남은 실제 ms 계산
-    const delay = Math.max(0, expected - elapsed);
-    timerRef = setTimeout(onTick, delay);
-  }
-
-  // 현재 구간의 총 초를 추적
-  let seconds_initial = REST_SEC;
-
-  function onTick() {
-    timeLeft--;
-    elTime.textContent = timeLeft;
-
-    /* REST 마지막 3초: 손 올리기 안내 */
-    if (mode === 'REST' && timeLeft <= 3 && !hasSpoken) {
-      showPrompt = true;
-      hasSpoken = true;
-      const hk = handKo(targetHand);
-      const msg = totalRounds === 2
-        ? `⚠️ 준비: 무작위 선택 — [${hk}]을 올려주세요!`
-        : `⚠️ 준비: 화면에 [${hk}]을 올려주세요!`;
+    /* REST 마지막 3초 — 손 올리기 안내 */
+    if(mode==='REST' && timeLeft<=3 && !hasSpoken) {
+      hasSpoken=true; showPrompt=true;
+      const h = hk(targetHand);
+      const msg = totalRounds===2
+        ? `⚠️ 준비: 무작위 선택 — [${h}]을 올려주세요!`
+        : `⚠️ 준비: 화면에 [${h}]을 올려주세요!`;
       setStatus(msg, 'var(--amber)');
-      speak(totalRounds === 2 ? `랜덤 과제입니다. ${hk}을 올려주세요.` : `화면에 ${hk}을 올려주세요.`);
+      speak(totalRounds===2 ? `랜덤 과제입니다. ${h}을 올려주세요.` : `화면에 ${h}을 올려주세요.`);
     }
-
-    if (timeLeft <= 0) {
-      if (mode === 'REST') {
-        seconds_initial = ACTIVE_SEC;
-        startTimer(ACTIVE_SEC);
-        switchMode('ACTIVE');
-      } else if (mode === 'ACTIVE') {
-        totalRounds++;
-        elRound.textContent = totalRounds;
-
-        if (totalRounds >= 3) {
-          /* 완료 */
-          mode = 'DONE';
-          timerBox.textContent = '연습 완료 — DONE';
-          timerBox.className = 's-done';
-          const acc = elAcc.textContent;
-          setStatus(`🎉 fMRI 연습이 완료되었습니다! (정확도: ${acc})`, 'var(--cyan)');
-          setOverlay('DONE', 'var(--cyan)');
-          speak('성공! 오늘의 에프 엠 알 아이 연습이 완료되었습니다. 수고하셨습니다.');
-          startBtn.textContent = '새로운 연습 시작 (Restart)';
-          startBtn.disabled = false;
-          const pid = document.getElementById('patient-id').value || 'Unknown';
-          setTimeout(() => downloadCSV(pid), 1500);
-          return;
-        }
-
-        /* 다음 라운드 손 결정 */
-        if (totalRounds === 1) {
-          targetHand = 'Right';
-        } else if (totalRounds === 2) {
-          randThirdHand = Math.random() < 0.5 ? 'Left' : 'Right';
-          targetHand = randThirdHand;
-        }
-
-        seconds_initial = REST_SEC;
-        startTimer(REST_SEC);
-        switchMode('REST');
-      }
-      return;
-    }
-    scheduleTick();
+    const nextMs = ((tickNum+1)*1000) - elapsed;
+    timerRef = setTimeout(tick, Math.max(0, nextMs));
   }
+  timerRef = setTimeout(tick, 1000);
+}
 
-  /* ── 패러다임 시작 ── */
-  function startParadigm() {
-    if (timerRef) clearTimeout(timerRef);
-    totalSuccess = 0; totalErrors = 0; totalRounds = 0;
-    targetHand = 'Left'; randThirdHand = 'Left';
-    updateStats(); elRound.textContent = 0;
-    startBtn.textContent = '패러다임 중단 후 재시작';
-
-    seconds_initial = REST_SEC;
+function onPeriodEnd() {
+  if(mode === 'REST') {
+    switchMode('ACTIVE');
+    startTimer(ACTIVE_SEC);
+  } else if(mode === 'ACTIVE') {
+    totalRounds++;
+    elRound.textContent = totalRounds;
+    if(totalRounds >= 3) { finish(); return; }
+    if(totalRounds === 1) targetHand = 'Right';
+    else if(totalRounds === 2) {
+      randThird = Math.random()<0.5 ? 'Left' : 'Right';
+      targetHand = randThird;
+    }
     switchMode('REST');
     startTimer(REST_SEC);
   }
+}
 
-  startBtn.addEventListener('click', startParadigm);
+function finish() {
+  mode='DONE';
+  timerBox.textContent='연습 완료 — DONE';
+  timerBox.className='s-done';
+  const acc = elAcc.textContent;
+  setStatus(`🎉 fMRI 연습이 완료되었습니다! (정확도: ${acc})`, 'var(--cyan)');
+  setOverlay('DONE', 'var(--cyan)');
+  speak('성공! 오늘의 에프 엠 알 아이 연습이 완료되었습니다. 수고하셨습니다.');
+  startBtn.textContent = '새로운 연습 시작 (Restart)';
+  startBtn.disabled = false;
+  setTimeout(() => downloadCSV(document.getElementById('patient-id').value||'Unknown'), 1500);
+}
 
-  /* ── CSV 다운로드 ── */
-  function downloadCSV(pid) {
-    const total   = totalSuccess + totalErrors;
-    const acc     = total > 0 ? ((totalSuccess/total)*100).toFixed(1) : 0;
-    const ts      = new Date().toLocaleString();
-    let csv = '\uFEFF';
-    csv += '항목,값\n';
-    csv += `환자 ID,${pid}\n`;
-    csv += `수행 일시,${ts}\n`;
-    csv += `프로토콜,R1:Left / R2:Right / R3:Random(${randThirdHand})\n`;
-    csv += `성공,${totalSuccess}회\n`;
-    csv += `오류,${totalErrors}회\n`;
-    csv += `정확도,${acc}%\n`;
-    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
-    const a    = document.createElement('a');
-    a.href     = URL.createObjectURL(blob);
-    a.download = `fMRI_${pid}_${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+function startParadigm() {
+  if(timerRef) clearTimeout(timerRef);
+  totalSuccess=0; totalErrors=0; totalRounds=0;
+  targetHand='Left'; randThird='Left'; seqIdx=0;
+  updateStats(); elRound.textContent=0;
+  startBtn.textContent = '패러다임 중단 후 재시작';
+  switchMode('REST');
+  startTimer(REST_SEC);
+}
+startBtn.addEventListener('click', startParadigm);
+
+function downloadCSV(pid) {
+  const tot = totalSuccess+totalErrors;
+  const acc = tot>0 ? ((totalSuccess/tot)*100).toFixed(1) : 0;
+  let csv = '\uFEFF항목,값\n';
+  csv += `환자 ID,${pid}\n수행 일시,${new Date().toLocaleString()}\n`;
+  csv += `프로토콜,R1:Left / R2:Right / R3:Random(${randThird})\n`;
+  csv += `성공,${totalSuccess}회\n오류,${totalErrors}회\n정확도,${acc}%\n`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
+  a.download = `fMRI_${pid}_${new Date().toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+/* ═══════════════════════════════════════
+   TensorFlow.js HandPose 초기화
+   runtime: 'tfjs' → 별도 WASM 파일 불필요
+   모바일 Chrome에서 안정적으로 동작
+═══════════════════════════════════════ */
+async function initModel() {
+  loadBarW.style.display = 'block';
+  setLoadPct(10);
+
+  /* 1차 시도: WebGL 백엔드 */
+  try {
+    await tf.setBackend('webgl');
+    await tf.ready();
+    setLoadPct(40);
+    detector = await handPoseDetection.createDetector(
+      handPoseDetection.SupportedModels.MediaPipeHands,
+      { runtime:'tfjs', modelType:'lite', maxHands:1 }
+    );
+    setLoadPct(100);
+    setTimeout(() => { loadBarW.style.display='none'; }, 500);
+    return true;
+  } catch(e) {
+    console.warn('[WebGL 실패, CPU 재시도]', e);
   }
 
-  /* ═══════════════════════════════════
-       MediaPipe Hands 초기화
-  ═══════════════════════════════════ */
-  const hands = new Hands({
-    locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-  });
+  /* 2차 시도: CPU 백엔드 폴백 */
+  try {
+    await tf.setBackend('cpu');
+    await tf.ready();
+    setLoadPct(70);
+    detector = await handPoseDetection.createDetector(
+      handPoseDetection.SupportedModels.MediaPipeHands,
+      { runtime:'tfjs', modelType:'lite', maxHands:1 }
+    );
+    setLoadPct(100);
+    setTimeout(() => { loadBarW.style.display='none'; }, 500);
+    return true;
+  } catch(e2) {
+    console.error('[모델 로딩 완전 실패]', e2);
+    return false;
+  }
+}
 
-  hands.setOptions({
-    maxNumHands: 1,
-    modelComplexity: 0,           // 모바일 성능 최적화 (1→0)
-    minDetectionConfidence: 0.50,
-    minTrackingConfidence: 0.50,
-    selfieMode: false             // 미러링은 CSS transform으로만 처리
-  });
+/* 추론 루프 */
+async function detectionLoop() {
+  if(video.readyState >= 2 && detector && mode !== 'DONE') {
+    /* canvas 크기를 video 실제 크기에 동기화 */
+    if(canvas.width  !== video.videoWidth  && video.videoWidth)  canvas.width  = video.videoWidth;
+    if(canvas.height !== video.videoHeight && video.videoHeight) canvas.height = video.videoHeight;
 
-  hands.onResults(onResults);
+    let hands = [];
+    try {
+      /* flipHorizontal:false — 미러링은 CSS transform으로만 처리 */
+      hands = await detector.estimateHands(video, { flipHorizontal: false });
+    } catch(_) {}
 
-  /* ── MediaPipe 결과 처리 ── */
-  function onResults(results) {
-    // canvas 크기를 video 실제 크기에 동기화
-    if (canvas.width  !== video.videoWidth  && video.videoWidth)  canvas.width  = video.videoWidth;
-    if (canvas.height !== video.videoHeight && video.videoHeight) canvas.height = video.videoHeight;
+    drawFrame(hands);
+  }
+  rafId = requestAnimationFrame(detectionLoop);
+}
 
-    ctx.save();
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+/* 그리기 & 게임 판정 */
+function drawFrame(hands) {
+  ctx.save();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    /* REST 십자 & 손 안내 */
-    if (mode === 'REST') {
-      const cx = canvas.width / 2, cy = canvas.height / 2;
-      ctx.strokeStyle = 'rgba(255,255,255,0.75)';
-      ctx.lineWidth   = 4;
-      ctx.beginPath(); ctx.moveTo(cx-22, cy); ctx.lineTo(cx+22, cy); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(cx, cy-22); ctx.lineTo(cx, cy+22); ctx.stroke();
+  /* REST 십자 */
+  if(mode === 'REST') {
+    const cx=canvas.width/2, cy=canvas.height/2;
+    ctx.strokeStyle='rgba(255,255,255,0.75)'; ctx.lineWidth=4;
+    ctx.beginPath(); ctx.moveTo(cx-22,cy); ctx.lineTo(cx+22,cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx,cy-22); ctx.lineTo(cx,cy+22); ctx.stroke();
 
-      if (showPrompt) {
-        const hk = handKo(targetHand);
-        // canvas는 scaleX(-1)이므로 텍스트도 좌우 반전 보정
-        ctx.save();
-        ctx.scale(-1, 1);
-        ctx.fillStyle    = 'var(--amber, #ffb830)';
-        ctx.font         = `bold ${Math.min(canvas.width * 0.055, 22)}px 'Noto Sans KR', sans-serif`;
-        ctx.textAlign    = 'center';
-        ctx.shadowColor  = '#000';
-        ctx.shadowBlur   = 8;
-        ctx.fillText(`[${hk}]을 화면에 올려주세요`, -canvas.width / 2, canvas.height * 0.13);
-        ctx.restore();
-      }
+    if(showPrompt) {
+      /* canvas가 scaleX(-1)이므로 텍스트 좌우 보정 */
+      ctx.save(); ctx.scale(-1,1);
+      ctx.fillStyle='#ffb830';
+      ctx.font=`bold ${Math.min(canvas.width*0.052,20)}px 'Noto Sans KR',sans-serif`;
+      ctx.textAlign='center'; ctx.shadowColor='#000'; ctx.shadowBlur=10;
+      ctx.fillText(`[${hk(targetHand)}]을 화면에 올려주세요`, -canvas.width/2, canvas.height*0.12);
+      ctx.restore();
     }
+  }
 
-    /* 손 랜드마크 & 게임 판정 */
-    if (results.multiHandLandmarks && results.multiHandedness) {
-      for (let i = 0; i < results.multiHandLandmarks.length; i++) {
-        const lm  = results.multiHandLandmarks[i];
-        const raw = results.multiHandedness[i].label; // MediaPipe 기준
-        // 전면 카메라 미러링 보정: MediaPipe "Left" → 실제 오른손
-        const detected = raw === 'Left' ? 'Right' : 'Left';
+  for(const hand of hands) {
+    const kp   = hand.keypoints;     /* 픽셀 좌표 [{x,y,name}] */
+    const kp3d = hand.keypoints3D;   /* 정규화 좌표 [{x,y,z,name}] */
+    const detectedHand = hand.handedness; /* 'Left' | 'Right' (tfjs가 이미 미러 보정) */
 
-        drawConnectors(ctx, lm, HAND_CONNECTIONS, { color:'#00c8ff', lineWidth:2 });
-        drawLandmarks(ctx,  lm,                    { color:'#ff4d6a', lineWidth:1, radius:3 });
+    /* 스켈레톤 */
+    drawSkeleton(kp);
 
-        if (mode === 'ACTIVE' && detected === targetHand && !isCooldown) {
-          const thumb  = lm[4];
-          const tgtIdx = SEQ[seqIdx];
-          const tgtLm  = lm[tgtIdx];
-          const dist   = Math.hypot(thumb.x - tgtLm.x, thumb.y - tgtLm.y);
+    /* ACTIVE 게임 판정 */
+    if(mode==='ACTIVE' && detectedHand===targetHand && !isCooldown) {
+      const thumb  = kp3d[4];
+      const tgtIdx = SEQ[seqIdx];
+      const tgtK3  = kp3d[tgtIdx];
+      const tgtKp  = kp[tgtIdx];
+      if(!thumb || !tgtK3 || !tgtKp) continue;
 
-          /* 타겟 원 그리기 */
-          ctx.beginPath();
-          ctx.arc(tgtLm.x * canvas.width, tgtLm.y * canvas.height, 26, 0, Math.PI*2);
-          ctx.strokeStyle = '#00c8ff'; ctx.lineWidth = 4; ctx.stroke();
+      const dist = Math.hypot(thumb.x-tgtK3.x, thumb.y-tgtK3.y);
 
-          /* 성공 판정 */
-          if (dist < 0.075) {
-            isCooldown = true;
-            totalSuccess++;
-            seqIdx = (seqIdx + 1) % SEQ.length;
-            setStatus(`🎯 성공! 다음: ${FNAME[SEQ[seqIdx]]}`, 'var(--green)');
+      /* 타겟 원 */
+      ctx.beginPath();
+      ctx.arc(tgtKp.x, tgtKp.y, 26, 0, Math.PI*2);
+      ctx.strokeStyle='#00c8ff'; ctx.lineWidth=4; ctx.stroke();
+
+      if(dist < TOUCH_DIST) {
+        /* 성공 */
+        isCooldown=true; totalSuccess++;
+        seqIdx=(seqIdx+1)%SEQ.length;
+        setStatus(`🎯 성공! 다음: ${FNAME[SEQ[seqIdx]]}`, 'var(--green)');
+        updateStats();
+        setTimeout(()=>{ isCooldown=false; }, 320);
+      } else {
+        /* 오답 */
+        for(const tipIdx of SEQ) {
+          if(tipIdx===tgtIdx) continue;
+          const wK3 = kp3d[tipIdx];
+          if(!wK3) continue;
+          if(Math.hypot(thumb.x-wK3.x, thumb.y-wK3.y) < WRONG_DIST && !isCooldown) {
+            isCooldown=true; totalErrors++;
+            setStatus(`⚠️ 순서 오류! 다시: ${FNAME[tgtIdx]}`, 'var(--red)');
             updateStats();
-            setTimeout(() => { isCooldown = false; }, 320);
-          } else {
-            /* 오답 판정: 다른 손가락이 엄지와 접촉 */
-            for (const tipIdx of SEQ) {
-              if (tipIdx === tgtIdx) continue;
-              const wLm   = lm[tipIdx];
-              const wDist = Math.hypot(thumb.x - wLm.x, thumb.y - wLm.y);
-              if (wDist < 0.038 && !isCooldown) {
-                isCooldown = true;
-                totalErrors++;
-                setStatus(`⚠️ 순서 오류! 다시: ${FNAME[tgtIdx]}`, 'var(--red)');
-                updateStats();
-                setTimeout(() => { isCooldown = false; }, 320);
-                break;
-              }
-            }
+            setTimeout(()=>{ isCooldown=false; }, 320);
+            break;
           }
         }
       }
     }
-    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawSkeleton(kp) {
+  ctx.strokeStyle='#00c8ff'; ctx.lineWidth=2;
+  for(const [a,b] of CONNECTIONS) {
+    const A=kp[a], B=kp[b];
+    if(!A||!B) continue;
+    ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.lineTo(B.x,B.y); ctx.stroke();
+  }
+  ctx.fillStyle='#ff4d6a';
+  for(const p of kp) {
+    if(!p) continue;
+    ctx.beginPath(); ctx.arc(p.x,p.y,3,0,Math.PI*2); ctx.fill();
+  }
+}
+
+/* ═══════════════════════════════════════
+   카메라 — 3단계 제약 완화 시도
+═══════════════════════════════════════ */
+async function startCamera() {
+  const constraintsList = [
+    { video:{ facingMode:'user', width:{ideal:640,max:1280}, height:{ideal:480,max:960} }, audio:false },
+    { video:{ facingMode:'user' }, audio:false },
+    { video:true, audio:false }
+  ];
+  let stream = null;
+  for(const c of constraintsList) {
+    try { stream = await navigator.mediaDevices.getUserMedia(c); break; }
+    catch(_) { continue; }
+  }
+  if(!stream) return false;
+
+  video.srcObject = stream;
+  await new Promise(res => {
+    video.onloadedmetadata = res;
+    setTimeout(res, 5000);
+  });
+  try { await video.play(); } catch(_) {}
+  return true;
+}
+
+/* 메인 초기화 */
+async function init() {
+  setStatus('카메라 연결 중...', 'var(--amber)');
+  const camOk = await startCamera();
+  if(!camOk) {
+    setStatus('❌ 카메라 접근 실패. HTTPS 및 권한을 확인해 주세요.', 'var(--red)');
+    setOverlay('카메라 오류', 'var(--red)');
+    return;
   }
 
-  /* ═══════════════════════════════════
-       카메라 — getUserMedia 직접 제어
-       (폴드7 등 고해상도 Android 대응)
-  ═══════════════════════════════════ */
-  async function startCamera() {
-    const constraints = {
-      video: {
-        facingMode: 'user',
-        width:  { ideal: 640, max: 1280 },
-        height: { ideal: 480, max: 960  }
-      },
-      audio: false
-    };
+  setStatus('AI 모델 로딩 중... (최초 1회, 약 10~20초 소요)', 'var(--amber)');
+  setOverlay('모델 로딩 중...', 'var(--amber)');
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      video.srcObject = stream;
-
-      await new Promise((resolve, reject) => {
-        video.onloadedmetadata = resolve;
-        video.onerror = reject;
-        setTimeout(resolve, 4000); // 4초 폴백
-      });
-
-      await video.play();
-      handsReady = true;
-      startLoop();
-      enableStart();
-
-    } catch (err) {
-      console.error('[카메라 오류]', err);
-      // 제약 완화 후 재시도
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        video.srcObject = stream;
-        await new Promise(r => { video.onloadedmetadata = r; setTimeout(r, 3000); });
-        await video.play();
-        handsReady = true;
-        startLoop();
-        enableStart();
-      } catch (err2) {
-        console.error('[카메라 재시도 실패]', err2);
-        setStatus('❌ 카메라 접근 실패. HTTPS 및 권한을 확인해 주세요.', 'var(--red)');
-        setOverlay('카메라 오류', 'var(--red)');
-      }
-    }
+  const modelOk = await initModel();
+  if(!modelOk) {
+    setStatus('❌ AI 모델 로딩 실패. 페이지를 새로고침 해주세요.', 'var(--red)');
+    setOverlay('모델 오류', 'var(--red)');
+    return;
   }
 
-  /* ── requestAnimationFrame 기반 루프 (camera_utils 미사용) ── */
-  function startLoop() {
-    if (rafId) cancelAnimationFrame(rafId);
-    async function loop() {
-      if (video.readyState >= 2 && handsReady) {
-        try { await hands.send({ image: video }); } catch(_) {}
-      }
-      rafId = requestAnimationFrame(loop);
-    }
-    rafId = requestAnimationFrame(loop);
-  }
+  rafId = requestAnimationFrame(detectionLoop);
+  startBtn.innerHTML = '패러다임 시작 (Start Task)';
+  startBtn.disabled = false;
+  setStatus('초기화 완료: 패러다임 시작을 눌러주세요.', 'var(--green)');
+  setOverlay('READY', 'var(--cyan)');
+  setTimeout(() => speak('패러다임 시작을 눌러주세요.'), 600);
+}
 
-  function enableStart() {
-    startBtn.innerHTML  = '패러다임 시작 (Start Task)';
-    startBtn.disabled   = false;
-    setStatus('초기화 완료: 패러다임 시작을 눌러주세요.', 'var(--green)');
-    setOverlay('READY', 'var(--cyan)');
-    setTimeout(() => speak('패러다임 시작을 눌러주세요.'), 600);
-  }
-
-  /* 시작 */
-  startCamera();
-
+init();
 })();
 </script>
 </body>
